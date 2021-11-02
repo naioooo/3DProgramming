@@ -1,0 +1,17 @@
+﻿  Camera.cpp
+  DDSTextureLoader12.cpp
+  GameFramework.cpp
+  LabProject08-2-1.cpp
+  Mesh.cpp
+  Object.cpp
+  Player.cpp
+  Scene.cpp
+  Shader.cpp
+C:\Users\naio\Desktop\3D게임프로그래밍2_1차과제_2017182005김민규\LabProject08-2-1\Shader.cpp(429,19): warning C4244: '초기화 중': 'double'에서 'float'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+  stdafx.cpp
+  Timer.cpp
+  코드를 생성하고 있습니다.
+  Previous IPDB not found, fall back to full compilation.
+  All 531 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  코드를 생성했습니다.
+  LabProject08-2-1.vcxproj -> C:\Users\naio\Desktop\3D게임프로그래밍2_1차과제_2017182005김민규\Release\LabProject08-2-1.exe
