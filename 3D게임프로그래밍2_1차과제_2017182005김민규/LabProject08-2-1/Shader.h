@@ -8,7 +8,6 @@
 #include "Camera.h"
 
 
-
 class CShader
 {
 public:
@@ -125,16 +124,13 @@ public:
 	virtual void ReleaseShaderVariables();
 
 	virtual void ReleaseUploadBuffers();
+	D3D12_BLEND_DESC CreateBlendState();
 
 	virtual void Render(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera);
 
-public:
-	CGameObject						**m_ppObjects = 0;
-	int								m_nObjects = 0;
-	
+public:	
 	CBillboardObject                **m_ppBillboardObjects = 0;
 	int								m_nBillboardObjects = 0;
-	
 	
 
 	ID3D12Resource					*m_pd3dcbGameObjects = NULL;
@@ -142,6 +138,40 @@ public:
 
 #ifdef _WITH_BATCH_MATERIAL
 	CMaterial						*m_pMaterial = NULL;
+#endif
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+
+class CEnemyShader : public CTexturedShader
+{
+public:
+	CEnemyShader();
+	virtual ~CEnemyShader();
+
+	virtual void BuildObjects(ID3D12Device* pd3dDevice, ID3D12GraphicsCommandList* pd3dCommandList, void* pContext = NULL);
+	virtual void AnimateObjects(float fTimeElapsed, CCamera* pCamera);
+	virtual void ReleaseObjects();
+
+	virtual void CreateShaderVariables(ID3D12Device* pd3dDevice, ID3D12GraphicsCommandList* pd3dCommandList);
+	virtual void UpdateShaderVariables(ID3D12GraphicsCommandList* pd3dCommandList);
+	virtual void ReleaseShaderVariables();
+
+	virtual void ReleaseUploadBuffers();
+
+	virtual void Render(ID3D12GraphicsCommandList* pd3dCommandList, CCamera* pCamera);
+
+public:
+
+	CEnemyObject                    **m_ppEnemyObjects = 0;
+	int								m_nEnemyObjects = 0;
+
+	ID3D12Resource                  *m_pd3dcbEnemyObjects = NULL;
+	CB_GAMEOBJECT_INFO              *m_pcbMappedEnemyObjects = NULL;
+
+#ifdef _WITH_BATCH_MATERIAL
+	CMaterial* m_pMaterial = NULL;
 #endif
 };
 
@@ -182,6 +212,43 @@ public:
 	CMaterial* m_pMaterial = NULL;
 #endif
 };
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+class CExplosiveShader : public CTexturedShader
+{
+public:
+	CExplosiveShader();
+	virtual ~CExplosiveShader();
+
+	virtual void BuildObjects(ID3D12Device* pd3dDevice, ID3D12GraphicsCommandList* pd3dCommandList, void* pContext = NULL);
+	virtual void AnimateObjects(float fTimeElapsed, CCamera* pCamera);
+	virtual void ReleaseObjects();
+
+	virtual void CreateShaderVariables(ID3D12Device* pd3dDevice, ID3D12GraphicsCommandList* pd3dCommandList);
+	virtual void UpdateShaderVariables(ID3D12GraphicsCommandList* pd3dCommandList);
+	virtual void ReleaseShaderVariables();
+
+	virtual void ReleaseUploadBuffers();
+	D3D12_BLEND_DESC CreateBlendState();
+
+	virtual void Render(ID3D12GraphicsCommandList* pd3dCommandList, CCamera* pCamera);
+
+public:
+	CExplosiveObject                **m_ppExplosiveObjects = 0;
+	int								m_nExplosiveObjects = 0;
+
+
+	ID3D12Resource                  *m_pd3dcbExplosiveObjects = NULL;
+	CB_GAMEOBJECT_INFO              *m_pcbMappedExplosiveObjects = NULL;
+
+#ifdef _WITH_BATCH_MATERIAL
+	CMaterial* m_pMaterial = NULL;
+#endif
+};
+
 
 
 

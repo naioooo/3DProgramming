@@ -7,6 +7,11 @@
 #include "DDSTextureLoader12.h"
 #include "Player.h"
 
+float RandF2(float fMin, float fMax)
+{
+	return(fMin + ((float)rand() / (float)RAND_MAX) * (fMax - fMin));
+}
+
 CShader::CShader()
 {
 	m_d3dSrvCPUDescriptorStartHandle.ptr = NULL;
@@ -353,7 +358,7 @@ void CBillboardShader::UpdateShaderVariables(ID3D12GraphicsCommandList *pd3dComm
 	{
 		CB_GAMEOBJECT_INFO *pbMappedcbGameObject = (CB_GAMEOBJECT_INFO *)((UINT8 *)m_pcbMappedGameObjects + (j * ncbElementBytes));
 		XMStoreFloat4x4(&pbMappedcbGameObject->m_xmf4x4World, XMMatrixTranspose(XMLoadFloat4x4(&m_ppBillboardObjects[j]->m_xmf4x4World)));
-	}
+	} 
 }
 
 void CBillboardShader::ReleaseShaderVariables()
@@ -371,20 +376,14 @@ void CBillboardShader::BuildObjects(ID3D12Device *pd3dDevice, ID3D12GraphicsComm
 {
 	CHeightMapTerrain *pTerrain = (CHeightMapTerrain *)pContext;
 
-	float fxPitch = 12.0f * 3.5f;
-	float fyPitch = 12.0f * 3.5f;
-	float fzPitch = 12.0f * 3.5f;
 
 	float fTerrainWidth = pTerrain->GetWidth();
 	float fTerrainLength = pTerrain->GetLength();
 
-	int xObjects = int(fTerrainWidth / fxPitch);
-	int yObjects = 1;
-	int zObjects = int(fTerrainLength / fzPitch);
-	m_nBillboardObjects = (xObjects * yObjects * zObjects);
+	m_nBillboardObjects = 100;
 
 	CTexture *pTexture = new CTexture(1, RESOURCE_TEXTURE2D, 0, 1);
-	pTexture->LoadTextureFromDDSFile(pd3dDevice, pd3dCommandList, L"Image/Brick02.dds", RESOURCE_TEXTURE2D, 0);
+	pTexture->LoadTextureFromDDSFile(pd3dDevice, pd3dCommandList, L"Image/TreeTexture.dds", RESOURCE_TEXTURE2D, 0);
 
 	UINT ncbElementBytes = ((sizeof(CB_GAMEOBJECT_INFO) + 255) & ~255);
 
@@ -401,45 +400,26 @@ void CBillboardShader::BuildObjects(ID3D12Device *pd3dDevice, ID3D12GraphicsComm
 	pCubeMaterial->SetTexture(pTexture);
 #endif
 
-	CTexturedRectMesh* pTexturedRectMesh = new CTexturedRectMesh(pd3dDevice, pd3dCommandList, 10.0f, 20.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	CTexturedRectMesh* pTexturedRectMesh = new CTexturedRectMesh(pd3dDevice, pd3dCommandList, 30.0f, 60.0f, 0.0f, 0.0f, 0.0f, 0.0f);
 
 	m_ppBillboardObjects = new CBillboardObject *[m_nBillboardObjects];
 
 	XMFLOAT3 xmf3RotateAxis, xmf3SurfaceNormal;
 	CBillboardObject *pBillboardObject = NULL;
-	for (int i = 0, x = 0; x < xObjects; x++)
+	for (int i = 0; i < m_nBillboardObjects; i++)
 	{
-		for (int z = 0; z < zObjects; z++)
-		{
-			for (int y = 0; y < yObjects; y++)
-			{
-				pBillboardObject = new CBillboardObject(1);
-				pBillboardObject->SetMesh(0, pTexturedRectMesh);
-				pBillboardObject->m_xmOOBB = pTexturedRectMesh->m_xmOOBB;
+		pBillboardObject = new CBillboardObject(1);
+		pBillboardObject->SetMesh(0, pTexturedRectMesh);
 #ifndef _WITH_BATCH_MATERIAL
-				pRotatingObject->SetMaterial(pCubeMaterial);
+		pRotatingObject->SetMaterial(pCubeMaterial);
 #endif
-				float xPosition = x * fxPitch;
-				float zPosition = z * fzPitch;
-				float fHeight = pTerrain->GetHeight(xPosition, zPosition);
-				pBillboardObject->SetPosition(xPosition, fHeight + (y * 3.0f * fyPitch) + 6.0f, zPosition);
-				if (y == 0)
-				{
-					xmf3SurfaceNormal = pTerrain->GetNormal(xPosition, zPosition);
-					xmf3RotateAxis = Vector3::CrossProduct(XMFLOAT3(0.0f, 1.0f, 0.0f), xmf3SurfaceNormal);
-					if (Vector3::IsZero(xmf3RotateAxis)) xmf3RotateAxis = XMFLOAT3(0.0f, 1.0f, 0.0f);
-					float fAngle = acos(Vector3::DotProduct(XMFLOAT3(0.0f, 1.0f, 0.0f), xmf3SurfaceNormal));
-					pBillboardObject->Rotate(&xmf3RotateAxis, XMConvertToDegrees(fAngle));
-				};
-				pBillboardObject->SetCbvGPUDescriptorHandlePtr(m_d3dCbvGPUDescriptorStartHandle.ptr + (::gnCbvSrvDescriptorIncrementSize * i));
-				m_ppBillboardObjects[i++] = pBillboardObject;
-			}
-		}
+		float xPosition = RandF2(0, fTerrainWidth);
+		float zPosition = RandF2(0, fTerrainLength);
+		float fHeight = pTerrain->GetHeight(xPosition, zPosition);
+		pBillboardObject->SetPosition(xPosition, fHeight + 30.0f, zPosition);	
+		pBillboardObject->SetCbvGPUDescriptorHandlePtr(m_d3dCbvGPUDescriptorStartHandle.ptr + (::gnCbvSrvDescriptorIncrementSize * i));
+		m_ppBillboardObjects[i] = pBillboardObject;		
 	}
-
-
-
-
 }
 
 void CBillboardShader::ReleaseObjects()
@@ -459,7 +439,8 @@ void CBillboardShader::AnimateObjects(float fTimeElapsed, CCamera* pCamera)
 {
 	for (int j = 0; j < m_nBillboardObjects; j++)
 	{
-		m_ppBillboardObjects[j]->Animate(fTimeElapsed, pCamera);
+		if (m_ppBillboardObjects[j]->m_bActive)
+			m_ppBillboardObjects[j]->Animate(fTimeElapsed, pCamera);
 	}
 }
 
@@ -488,6 +469,176 @@ void CBillboardShader::Render(ID3D12GraphicsCommandList *pd3dCommandList, CCamer
 		if (m_ppBillboardObjects[j]) m_ppBillboardObjects[j]->Render(pd3dCommandList, pCamera);
 	}
 }
+
+D3D12_BLEND_DESC CBillboardShader::CreateBlendState()
+{
+	D3D12_BLEND_DESC d3dBlendDesc;
+	::ZeroMemory(&d3dBlendDesc, sizeof(D3D12_BLEND_DESC));
+	d3dBlendDesc.AlphaToCoverageEnable = FALSE;
+	d3dBlendDesc.IndependentBlendEnable = FALSE;
+	d3dBlendDesc.RenderTarget[0].BlendEnable = TRUE;
+	d3dBlendDesc.RenderTarget[0].LogicOpEnable = FALSE;
+	d3dBlendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	d3dBlendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+	d3dBlendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+	d3dBlendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+	d3dBlendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+	d3dBlendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	d3dBlendDesc.RenderTarget[0].LogicOp = D3D12_LOGIC_OP_NOOP;
+	d3dBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+	return(d3dBlendDesc);
+}
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+CEnemyShader::CEnemyShader()
+{
+}
+
+CEnemyShader::~CEnemyShader()
+{
+}
+
+void CEnemyShader::CreateShaderVariables(ID3D12Device* pd3dDevice, ID3D12GraphicsCommandList* pd3dCommandList)
+{
+	UINT ncbElementBytes = ((sizeof(CB_GAMEOBJECT_INFO) + 255) & ~255); //256의 배수
+	m_pd3dcbEnemyObjects = ::CreateBufferResource(pd3dDevice, pd3dCommandList, NULL, ncbElementBytes * m_nEnemyObjects, D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, NULL);
+
+	m_pd3dcbEnemyObjects->Map(0, NULL, (void**)&m_pcbMappedEnemyObjects);
+}
+
+void CEnemyShader::UpdateShaderVariables(ID3D12GraphicsCommandList* pd3dCommandList)
+{
+	UINT ncbElementBytes = ((sizeof(CB_GAMEOBJECT_INFO) + 255) & ~255);
+	for (int j = 0; j < m_nEnemyObjects; j++)
+	{
+		CB_GAMEOBJECT_INFO* pbMappedcbGameObject = (CB_GAMEOBJECT_INFO*)((UINT8*)m_pcbMappedEnemyObjects + (j * ncbElementBytes));
+		XMStoreFloat4x4(&pbMappedcbGameObject->m_xmf4x4World, XMMatrixTranspose(XMLoadFloat4x4(&m_ppEnemyObjects[j]->m_xmf4x4World)));
+	}
+}
+
+void CEnemyShader::ReleaseShaderVariables()
+{
+	if (m_pd3dcbEnemyObjects)
+	{
+		m_pd3dcbEnemyObjects->Unmap(0, NULL);
+		m_pd3dcbEnemyObjects->Release();
+	}
+
+	CTexturedShader::ReleaseShaderVariables();
+}
+
+void CEnemyShader::BuildObjects(ID3D12Device* pd3dDevice, ID3D12GraphicsCommandList* pd3dCommandList, void* pContext)
+{
+	CHeightMapTerrain* pTerrain = (CHeightMapTerrain*)pContext;
+
+
+	float fTerrainWidth = pTerrain->GetWidth();
+	float fTerrainLength = pTerrain->GetLength();
+
+	m_nEnemyObjects = 100;
+
+	CTexture* pTexture = new CTexture(1, RESOURCE_TEXTURE2D, 0, 1);
+	pTexture->LoadTextureFromDDSFile(pd3dDevice, pd3dCommandList, L"Image/Brick02.dds", RESOURCE_TEXTURE2D, 0);
+
+	UINT ncbElementBytes = ((sizeof(CB_GAMEOBJECT_INFO) + 255) & ~255);
+
+	CreateCbvSrvDescriptorHeaps(pd3dDevice, m_nEnemyObjects, 1);
+	CreateShaderVariables(pd3dDevice, pd3dCommandList);
+	CreateConstantBufferViews(pd3dDevice, m_nEnemyObjects, m_pd3dcbEnemyObjects, ncbElementBytes);
+	CreateShaderResourceViews(pd3dDevice, pTexture, 0, 3);
+
+#ifdef _WITH_BATCH_MATERIAL
+	m_pMaterial = new CMaterial();
+	m_pMaterial->SetTexture(pTexture);
+#else
+	CMaterial* pCubeMaterial = new CMaterial();
+	pCubeMaterial->SetTexture(pTexture);
+#endif
+
+	CCubeMeshTextured* pTexturedRectMesh = new CCubeMeshTextured(pd3dDevice, pd3dCommandList, 10.0f, 10.0f, 10.0f);
+
+	m_ppEnemyObjects = new CEnemyObject*[m_nEnemyObjects];
+
+	XMFLOAT3 xmf3RotateAxis, xmf3SurfaceNormal;
+	CEnemyObject* pEnemyObject = NULL;
+	for (int i = 0; i < m_nEnemyObjects; i++)
+	{
+		pEnemyObject = new CEnemyObject(1);
+		pEnemyObject->SetMesh(0, pTexturedRectMesh);
+		pEnemyObject->m_xmOOBB = pTexturedRectMesh->m_xmOOBB;
+#ifndef _WITH_BATCH_MATERIAL
+		pRotatingObject->SetMaterial(pCubeMaterial);
+#endif
+		XMFLOAT3 Up = XMFLOAT3(1.0f, 0.0f, 0.0f);
+		pEnemyObject->SetRotationAxis(Up);
+
+		float xPosition = RandF2(0, fTerrainWidth);
+		float zPosition = RandF2(0, fTerrainLength);
+		float fHeight = pTerrain->GetHeight(xPosition, zPosition);
+		pEnemyObject->SetPosition(xPosition, fHeight + 5.0f, zPosition);
+		pEnemyObject->SetRotationSpeed(10.0f);
+		pEnemyObject->SetActive(true);
+		pEnemyObject->SetCbvGPUDescriptorHandlePtr(m_d3dCbvGPUDescriptorStartHandle.ptr + (::gnCbvSrvDescriptorIncrementSize * i));
+		m_ppEnemyObjects[i] = pEnemyObject;
+	}
+
+
+
+
+}
+
+void CEnemyShader::ReleaseObjects()
+{
+	if (m_ppEnemyObjects)
+	{
+		for (int j = 0; j < m_nEnemyObjects; j++) if (m_ppEnemyObjects[j]) delete m_ppEnemyObjects[j];
+		delete[] m_ppEnemyObjects;
+	}
+
+#ifdef _WITH_BATCH_MATERIAL
+	if (m_pMaterial) delete m_pMaterial;
+#endif
+}
+
+void CEnemyShader::AnimateObjects(float fTimeElapsed, CCamera* pCamera)
+{
+	for (int j = 0; j < m_nEnemyObjects; j++)
+	{
+		if (m_ppEnemyObjects[j]->m_bActive)
+			m_ppEnemyObjects[j]->Animate(fTimeElapsed);
+	}
+}
+
+void CEnemyShader::ReleaseUploadBuffers()
+{
+	if (m_ppEnemyObjects)
+	{
+		for (int j = 0; j < m_nEnemyObjects; j++) if (m_ppEnemyObjects[j]) m_ppEnemyObjects[j]->ReleaseUploadBuffers();
+	}
+
+#ifdef _WITH_BATCH_MATERIAL
+	if (m_pMaterial) m_pMaterial->ReleaseUploadBuffers();
+#endif
+}
+
+void CEnemyShader::Render(ID3D12GraphicsCommandList* pd3dCommandList, CCamera* pCamera)
+{
+	CTexturedShader::Render(pd3dCommandList, pCamera);
+
+#ifdef _WITH_BATCH_MATERIAL
+	if (m_pMaterial) m_pMaterial->UpdateShaderVariables(pd3dCommandList);
+#endif
+
+	for (int j = 0; j < m_nEnemyObjects; j++)
+	{
+		if (m_ppEnemyObjects[j]) m_ppEnemyObjects[j]->Render(pd3dCommandList, pCamera);
+	}
+}
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -570,7 +721,7 @@ void CBulletShader::BuildObjects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommand
 		pBulletObject->SetRotationAxis(Up);
 		XMFLOAT3 SetPos = XMFLOAT3(pTerrain->GetWidth() * 0.5f, 0.0f, fTerrainLength * 0.5f);
 		pBulletObject->SetPosition(SetPos);
-		pBulletObject->SetRotationSpeed(0.0f);
+		pBulletObject->SetRotationSpeed(10.0f);
 		pBulletObject->SetMovingSpeed(120.0f);
 		pBulletObject->SetActive(false);
 		pBulletObject->SetCbvGPUDescriptorHandlePtr(m_d3dCbvGPUDescriptorStartHandle.ptr + (::gnCbvSrvDescriptorIncrementSize * i));
@@ -659,6 +810,163 @@ void CBulletShader::Render(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *
 		if (m_ppBulletObjects[j]) m_ppBulletObjects[j]->Render(pd3dCommandList, pCamera);
 	}
 }
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+CExplosiveShader::CExplosiveShader()
+{
+}
+
+CExplosiveShader::~CExplosiveShader()
+{
+}
+
+void CExplosiveShader::CreateShaderVariables(ID3D12Device* pd3dDevice, ID3D12GraphicsCommandList* pd3dCommandList)
+{
+	UINT ncbElementBytes = ((sizeof(CB_GAMEOBJECT_INFO) + 255) & ~255); //256의 배수
+	m_pd3dcbExplosiveObjects = ::CreateBufferResource(pd3dDevice, pd3dCommandList, NULL, ncbElementBytes * m_nExplosiveObjects, D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, NULL);
+
+	m_pd3dcbExplosiveObjects->Map(0, NULL, (void**)&m_pcbMappedExplosiveObjects);
+}
+
+void CExplosiveShader::UpdateShaderVariables(ID3D12GraphicsCommandList* pd3dCommandList)
+{
+	UINT ncbElementBytes = ((sizeof(CB_GAMEOBJECT_INFO) + 255) & ~255);
+	for (int j = 0; j < m_nExplosiveObjects; j++)
+	{
+		CB_GAMEOBJECT_INFO* pbMappedcbGameObject = (CB_GAMEOBJECT_INFO*)((UINT8*)m_pcbMappedExplosiveObjects + (j * ncbElementBytes));
+		XMStoreFloat4x4(&pbMappedcbGameObject->m_xmf4x4World, XMMatrixTranspose(XMLoadFloat4x4(&m_ppExplosiveObjects[j]->m_xmf4x4World)));
+	}
+}
+
+void CExplosiveShader::ReleaseShaderVariables()
+{
+	if (m_pd3dcbExplosiveObjects)
+	{
+		m_pd3dcbExplosiveObjects->Unmap(0, NULL);
+		m_pd3dcbExplosiveObjects->Release();
+	}
+
+	CTexturedShader::ReleaseShaderVariables();
+}
+
+void CExplosiveShader::BuildObjects(ID3D12Device* pd3dDevice, ID3D12GraphicsCommandList* pd3dCommandList, void* pContext)
+{
+	CHeightMapTerrain* pTerrain = (CHeightMapTerrain*)pContext;
+	m_nExplosiveObjects = 100;
+
+	CTexture* pTexture = new CTexture(1, RESOURCE_TEXTURE2D, 0, 1);
+	pTexture->LoadTextureFromDDSFile(pd3dDevice, pd3dCommandList, L"Image/ExplosionTexture.dds", RESOURCE_TEXTURE2D, 0);
+
+	UINT ncbElementBytes = ((sizeof(CB_GAMEOBJECT_INFO) + 255) & ~255);
+
+	CreateCbvSrvDescriptorHeaps(pd3dDevice, m_nExplosiveObjects, 1);
+	CreateShaderVariables(pd3dDevice, pd3dCommandList);
+	CreateConstantBufferViews(pd3dDevice, m_nExplosiveObjects, m_pd3dcbExplosiveObjects, ncbElementBytes);
+	CreateShaderResourceViews(pd3dDevice, pTexture, 0, 3);
+
+#ifdef _WITH_BATCH_MATERIAL
+	m_pMaterial = new CMaterial();
+	m_pMaterial->SetTexture(pTexture);
+#else
+	CMaterial* pCubeMaterial = new CMaterial();
+	pCubeMaterial->SetTexture(pTexture);
+#endif
+
+	CTexturedRectMesh* pTexturedRectMesh = new CTexturedRectMesh(pd3dDevice, pd3dCommandList, 10.0f, 10.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+
+	m_ppExplosiveObjects = new CExplosiveObject * [m_nExplosiveObjects];
+
+
+	XMFLOAT3 xmf3RotateAxis, xmf3SurfaceNormal;
+	CExplosiveObject* pExplosiveObject = NULL;
+	for (int i = 0; i < m_nExplosiveObjects; i++)
+	{
+		pExplosiveObject = new CExplosiveObject(1);
+		pExplosiveObject->SetMesh(0, pTexturedRectMesh);
+#ifndef _WITH_BATCH_MATERIAL
+		pRotatingObject->SetMaterial(pCubeMaterial);
+#endif
+		XMFLOAT3 SetPos = XMFLOAT3(0.0f, 100.0f, 0.0f);
+		pExplosiveObject->SetPosition(SetPos);
+		XMFLOAT3 Up = XMFLOAT3(1.0f, 0.0f, 0.0f);
+		pExplosiveObject->SetRotationAxis(Up);
+		pExplosiveObject->SetRotationSpeed(15.0f);
+		pExplosiveObject->SetActive(false);
+		pExplosiveObject->SetBlowingUp(false);
+		pExplosiveObject->SetCbvGPUDescriptorHandlePtr(m_d3dCbvGPUDescriptorStartHandle.ptr + (::gnCbvSrvDescriptorIncrementSize * i));
+		m_ppExplosiveObjects[i] = pExplosiveObject;
+	}
+}
+
+void CExplosiveShader::ReleaseObjects()
+{
+	if (m_ppExplosiveObjects)
+	{
+		for (int j = 0; j < m_nExplosiveObjects; j++) if (m_ppExplosiveObjects[j]) delete m_ppExplosiveObjects[j];
+		delete[] m_ppExplosiveObjects;
+	}
+
+#ifdef _WITH_BATCH_MATERIAL
+	if (m_pMaterial) delete m_pMaterial;
+#endif
+}
+
+void CExplosiveShader::AnimateObjects(float fTimeElapsed, CCamera* pCamera)
+{
+	for (int j = 0; j < m_nExplosiveObjects; j++)
+	{
+		if (m_ppExplosiveObjects[j]->m_bActive)
+			m_ppExplosiveObjects[j]->Animate(fTimeElapsed, pCamera);
+	}
+}
+
+void CExplosiveShader::ReleaseUploadBuffers()
+{
+	if (m_ppExplosiveObjects)
+	{
+		for (int j = 0; j < m_nExplosiveObjects; j++) if (m_ppExplosiveObjects[j]) m_ppExplosiveObjects[j]->ReleaseUploadBuffers();
+	}
+
+#ifdef _WITH_BATCH_MATERIAL
+	if (m_pMaterial) m_pMaterial->ReleaseUploadBuffers();
+#endif
+}
+
+void CExplosiveShader::Render(ID3D12GraphicsCommandList* pd3dCommandList, CCamera* pCamera)
+{
+	CTexturedShader::Render(pd3dCommandList, pCamera);
+
+#ifdef _WITH_BATCH_MATERIAL
+	if (m_pMaterial) m_pMaterial->UpdateShaderVariables(pd3dCommandList);
+#endif
+
+	for (int j = 0; j < m_nExplosiveObjects; j++)
+	{
+		if (m_ppExplosiveObjects[j]) m_ppExplosiveObjects[j]->Render(pd3dCommandList, pCamera);
+	}
+}
+
+D3D12_BLEND_DESC CExplosiveShader::CreateBlendState()
+{
+	D3D12_BLEND_DESC d3dBlendDesc;
+	::ZeroMemory(&d3dBlendDesc, sizeof(D3D12_BLEND_DESC));
+	d3dBlendDesc.AlphaToCoverageEnable = FALSE;
+	d3dBlendDesc.IndependentBlendEnable = FALSE;
+	d3dBlendDesc.RenderTarget[0].BlendEnable = TRUE;
+	d3dBlendDesc.RenderTarget[0].LogicOpEnable = FALSE;
+	d3dBlendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	d3dBlendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+	d3dBlendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+	d3dBlendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+	d3dBlendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+	d3dBlendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	d3dBlendDesc.RenderTarget[0].LogicOp = D3D12_LOGIC_OP_NOOP;
+	d3dBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+	return(d3dBlendDesc);
+}
+
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //

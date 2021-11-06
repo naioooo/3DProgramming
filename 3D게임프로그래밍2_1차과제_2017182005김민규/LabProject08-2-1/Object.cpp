@@ -520,11 +520,10 @@ CHeightMapTerrain::CHeightMapTerrain(ID3D12Device *pd3dDevice, ID3D12GraphicsCom
 	CTexture *pTerrainTexture = new CTexture(5, RESOURCE_TEXTURE2D, 0, 1);
 
 	pTerrainTexture->LoadTextureFromDDSFile(pd3dDevice, pd3dCommandList, L"Image/Base_Texture.dds", RESOURCE_TEXTURE2D, 0);
-	pTerrainTexture->LoadTextureFromDDSFile(pd3dDevice, pd3dCommandList, L"Image/Detail_Texture_7.dds", RESOURCE_TEXTURE2D, 1);
-	pTerrainTexture->LoadTextureFromDDSFile(pd3dDevice, pd3dCommandList, L"Image/Detail_Texture_1.dds", RESOURCE_TEXTURE2D, 2);
+	pTerrainTexture->LoadTextureFromDDSFile(pd3dDevice, pd3dCommandList, L"Image/MudTexture.dds", RESOURCE_TEXTURE2D, 1);
+	pTerrainTexture->LoadTextureFromDDSFile(pd3dDevice, pd3dCommandList, L"Image/SnowTexture.dds", RESOURCE_TEXTURE2D, 2);
 	pTerrainTexture->LoadTextureFromDDSFile(pd3dDevice, pd3dCommandList, L"Image/Lava(Diffuse).dds", RESOURCE_TEXTURE2D, 3);
-//	pTerrainTexture->LoadTextureFromDDSFile(pd3dDevice, pd3dCommandList, L"Image/HeightMap-Alpha(Flipped).dds", RESOURCE_TEXTURE2D, 4);
-	pTerrainTexture->LoadTextureFromDDSFile(pd3dDevice, pd3dCommandList, L"Image/HeightMap2(Flipped)Alpha.dds", RESOURCE_TEXTURE2D, 4);
+	pTerrainTexture->LoadTextureFromDDSFile(pd3dDevice, pd3dCommandList, L"Image/DrawHeightMap.dds", RESOURCE_TEXTURE2D, 4);
 	
 	UINT ncbElementBytes = ((sizeof(CB_GAMEOBJECT_INFO) + 255) & ~255); //256의 배수
 
@@ -563,8 +562,7 @@ CTerrainWater::CTerrainWater(ID3D12Device* pd3dDevice, ID3D12GraphicsCommandList
 
 	pWaterTexture->LoadTextureFromDDSFile(pd3dDevice, pd3dCommandList, L"Image/Water_Base_Texture_0.dds", RESOURCE_TEXTURE2D, 0);
 	pWaterTexture->LoadTextureFromDDSFile(pd3dDevice, pd3dCommandList, L"Image/Water_Detail_Texture_0.dds", RESOURCE_TEXTURE2D, 1);
-	pWaterTexture->LoadTextureFromDDSFile(pd3dDevice, pd3dCommandList, L"Image/Lava(Diffuse).dds", RESOURCE_TEXTURE2D, 2);
-	//	pWaterTexture->LoadTextureFromDDSFile(pd3dDevice, pd3dCommandList, L"Image/Water_Texture_Alpha.dds", RESOURCE_TEXTURE2D, 2);
+	pWaterTexture->LoadTextureFromDDSFile(pd3dDevice, pd3dCommandList, L"Image/Water_Texture_Alpha.dds", RESOURCE_TEXTURE2D, 2);
 
 	UINT ncbElementBytes = ((sizeof(CB_GAMEOBJECT_INFO) + 255) & ~255); //256의 배수
 
@@ -704,11 +702,30 @@ void CBillboardObject::SetLookAt(XMFLOAT3& xmf3Target)
 }
 
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+CEnemyObject::CEnemyObject(int nMeshes)
+{
+	m_xmf3RotationAxis = XMFLOAT3(0.0f, 1.0f, 0.0f);
+	m_fRotationSpeed = 15.0f;
+}
+
+CEnemyObject::~CEnemyObject()
+{
+}
+
+void CEnemyObject::Animate(float fTimeElapsed)
+{
+	UpdateBoundingBox();
+	CGameObject::Rotate(&m_xmf3RotationAxis, m_fRotationSpeed * fTimeElapsed);
+}
+
+void CEnemyObject::Render(ID3D12GraphicsCommandList* pd3dCommandList, CCamera* pCamera)
+{
+	CGameObject::Render(pd3dCommandList, pCamera);
+}
+
 //////////////////////////////////////////////
-//CBulletObject::CBulletObject(float fEffectiveRange)
-//{
-//	m_fBulletEffectiveRange = fEffectiveRange;
-//}
 CBulletObject::CBulletObject(int nMeshes)
 {
 }
@@ -745,8 +762,8 @@ void CBulletObject::Animate(float fElapsedTime, CCamera* pCamera)
 	xmf3Position = Vector3::Add(xmf3Position, xmf3Movement);
 	SetPosition(xmf3Position);
 #else
-	//XMFLOAT4X4 mtxRotate = Matrix4x4::RotationYawPitchRoll(0.0f, m_fRotationSpeed * fElapsedTime, 0.0f);
-	//m_xmf4x4World = Matrix4x4::Multiply(mtxRotate, m_xmf4x4World);
+	XMFLOAT4X4 mtxRotate = Matrix4x4::RotationYawPitchRoll(0.0f, m_fRotationSpeed * fElapsedTime, 0.0f);
+	m_xmf4x4World = Matrix4x4::Multiply(mtxRotate, m_xmf4x4World);
 	XMFLOAT3 xmf3Movement = Vector3::ScalarProduct(m_xmf3MovingDirection, fDistance, false);
 	XMFLOAT3 xmf3Position = GetPosition();
 	xmf3Position = Vector3::Add(xmf3Position, xmf3Movement);
@@ -761,10 +778,6 @@ void CBulletObject::Animate(float fElapsedTime, CCamera* pCamera)
 		XMFLOAT3 SetPos = XMFLOAT3(0.0f, 200.0f, 0.0f);
 		SetPosition(SetPos);
 	}
-
-	//XMFLOAT3 xmf3CameraPosition = pCamera->GetPosition();
-	//SetLookAt(xmf3CameraPosition);
-
 
 	UpdateBoundingBox();
 
@@ -797,103 +810,37 @@ void CBulletObject::SetLookAt(XMFLOAT3& xmf3Target)
 
 ////////////////////////////////////////////////////////////
 
-XMFLOAT3 CExplosiveObject::m_pxmf3SphereVectors[EXPLOSION_DEBRISES];
-CMesh* CExplosiveObject::m_pExplosionMesh = NULL;
 
 CExplosiveObject::CExplosiveObject(int nMeshes)
 {
-	m_xmf4x4World = Matrix4x4::Identity();
-	m_nMeshes = nMeshes;
-	m_ppMeshes = NULL;
-	if (m_nMeshes > 0)
-	{
-		m_ppMeshes = new CMesh * [m_nMeshes];
-		for (int i = 0; i < m_nMeshes; i++) m_ppMeshes[i] = NULL;
-	}
+
 }
 
 CExplosiveObject::~CExplosiveObject()
 {
 }
 
-inline float RandF(float fMin, float fMax)
-{
-	return(fMin + ((float)rand() / (float)RAND_MAX) * (fMax - fMin));
-}
-
-
-XMVECTOR RandomUnitVectorOnSphere()
-{
-	XMVECTOR xmvOne = XMVectorSet(1.0f, 1.0f, 1.0f, 1.0f);
-	XMVECTOR xmvZero = XMVectorZero();
-
-	while (true)
-	{
-		XMVECTOR v = XMVectorSet(RandF(-1.0f, 1.0f), RandF(-1.0f, 1.0f), RandF(-1.0f, 1.0f), 0.0f);
-		if (!XMVector3Greater(XMVector3LengthSq(v), xmvOne)) return(XMVector3Normalize(v));
-	}
-}
-
-void CExplosiveObject::PrepareExplosion(ID3D12Device* pd3dDevice, ID3D12GraphicsCommandList* pd3dCommandList)
-{
-	for (int i = 0; i < EXPLOSION_DEBRISES; i++) XMStoreFloat3(&m_pxmf3SphereVectors[i], ::RandomUnitVectorOnSphere());
-	m_pExplosionMesh = new CTexturedRectMesh(pd3dDevice, pd3dCommandList, 3.0f, 3.0f, 0.0f, 0.0f, 0.0f, 0.0f);
-}
-
-
 void CExplosiveObject::Animate(float fElapsedTime, CCamera *pCamera)
 {
 	if (m_bBlowingUp)
 	{
 		m_fElapsedTimes += fElapsedTime;
-		if (m_fElapsedTimes <= m_fDuration)
+		CGameObject::Rotate(&m_xmf3RotationAxis, m_fRotationSpeed * fElapsedTime);
+		XMFLOAT3 xmf3CameraPosition = pCamera->GetPosition();
+		SetLookAt(xmf3CameraPosition);
+		if (m_fElapsedTimes > m_fDuration)
 		{
-			XMFLOAT3 xmf3Position = GetPosition();
-			for (int i = 0; i < EXPLOSION_DEBRISES; i++)
-			{
-				m_pxmf4x4Transforms[i] = Matrix4x4::Identity();
-				m_pxmf4x4Transforms[i]._41 = xmf3Position.x + m_pxmf3SphereVectors[i].x * m_fExplosionSpeed * m_fElapsedTimes;
-				m_pxmf4x4Transforms[i]._42 = xmf3Position.y + m_pxmf3SphereVectors[i].y * m_fExplosionSpeed * m_fElapsedTimes;
-				m_pxmf4x4Transforms[i]._43 = xmf3Position.z + m_pxmf3SphereVectors[i].z * m_fExplosionSpeed * m_fElapsedTimes;
-				XMFLOAT4X4 RAxis = Matrix4x4::RotationAxis(m_pxmf3SphereVectors[i], m_fExplosionRotation * m_fElapsedTimes);
-				m_pxmf4x4Transforms[i] = Matrix4x4::Multiply(RAxis, m_pxmf4x4Transforms[i]);
-			}
-		}
-		else
-		{
-			m_bBlowingUp = false;
-			m_bCollied = false;
+			SetBlowingUp(false);
 			SetActive(false);
 			m_fElapsedTimes = 0.0f;
-			XMFLOAT3 xmf3CameraPosition = pCamera->GetPosition();
-			SetLookAt(xmf3CameraPosition);
 		}
-	}
+	}	
 	else
 	{
 		CGameObject::Animate(fElapsedTime, pCamera);
 	}
 }
 
-void CExplosiveObject::Render(ID3D12GraphicsCommandList* pd3dCommandList, CCamera* pCamera)
-{
-	if (m_bBlowingUp)
-	{
-
-		for (int i = 0; i < EXPLOSION_DEBRISES; i++)
-		{
-			if (m_pExplosionMesh)
-			{
-				UpdateShaderVariables(pd3dCommandList, m_pxmf4x4Transforms[i]);
-				m_pExplosionMesh->Render(pd3dCommandList);
-			}
-		}
-	}
-	else
-	{
-		CGameObject::Render(pd3dCommandList, pCamera);
-	}
-}
 
 void CExplosiveObject::SetLookAt(XMFLOAT3& xmf3Target)
 {

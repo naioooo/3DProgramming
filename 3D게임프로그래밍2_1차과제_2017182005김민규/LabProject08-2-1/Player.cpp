@@ -24,7 +24,7 @@ CPlayer::CPlayer(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dComman
 
 	m_fPitch = 0.0f;
 	m_fRoll = 0.0f;
-	m_fYaw = 0.0f;
+	m_fYaw = 1.0f;
 }
 
 CPlayer::~CPlayer()
@@ -154,6 +154,7 @@ void CPlayer::Rotate(float x, float y, float z)
 void CPlayer::Update(float fTimeElapsed)
 {
 	m_xmf3Velocity = Vector3::Add(m_xmf3Velocity, Vector3::ScalarProduct(m_xmf3Gravity, fTimeElapsed, false));
+	
 	float fLength = sqrtf(m_xmf3Velocity.x * m_xmf3Velocity.x + m_xmf3Velocity.z * m_xmf3Velocity.z);
 	float fMaxVelocityXZ = m_fMaxVelocityXZ * fTimeElapsed;
 	if (fLength > m_fMaxVelocityXZ)
@@ -161,11 +162,13 @@ void CPlayer::Update(float fTimeElapsed)
 		m_xmf3Velocity.x *= (fMaxVelocityXZ / fLength);
 		m_xmf3Velocity.z *= (fMaxVelocityXZ / fLength);
 	}
+
 	float fMaxVelocityY = m_fMaxVelocityY * fTimeElapsed;
 	fLength = sqrtf(m_xmf3Velocity.y * m_xmf3Velocity.y);
 	if (fLength > m_fMaxVelocityY) m_xmf3Velocity.y *= (fMaxVelocityY / fLength);
 
-	Move(m_xmf3Velocity, false);
+	XMFLOAT3 xmf3Velocity = Vector3::ScalarProduct(m_xmf3Velocity, fTimeElapsed, false);
+	Move(xmf3Velocity, false);
 
 	if (m_pPlayerUpdatedContext) OnPlayerUpdateCallback(fTimeElapsed);
 
@@ -176,7 +179,7 @@ void CPlayer::Update(float fTimeElapsed)
 	m_pCamera->RegenerateViewMatrix();
 
 	fLength = Vector3::Length(m_xmf3Velocity);
-	float fDeceleration = (m_fFriction * fTimeElapsed);
+	float fDeceleration = (m_fFriction * fTimeElapsed) / 2;
 	if (fDeceleration > fLength) fDeceleration = fLength;
 	m_xmf3Velocity = Vector3::Add(m_xmf3Velocity, Vector3::ScalarProduct(m_xmf3Velocity, -fDeceleration, true));
 }
@@ -344,23 +347,36 @@ CTerrainPlayer::CTerrainPlayer(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandLi
 
 	CreateShaderVariables(pd3dDevice, pd3dCommandList);
 
-	CCubeMeshDiffused* pCubeMesh = new CCubeMeshDiffused(pd3dDevice, pd3dCommandList, 4.0f, 12.0f, 4.0f);
+	CTexture* pTexture = new CTexture(1, RESOURCE_TEXTURE2D, 0, 1);
+	pTexture->LoadTextureFromDDSFile(pd3dDevice, pd3dCommandList, L"Image/brick01.dds", RESOURCE_TEXTURE2D, 0);	
+
+#ifdef _WITH_BATCH_MATERIAL
+	m_pMaterial = new CMaterial();
+	m_pMaterial->SetTexture(pTexture);
+#else
+	CMaterial* pCubeMaterial = new CMaterial();
+	pCubeMaterial->SetTexture(pTexture);
+#endif
+
+	CAirplaneMeshDiffused* pCubeMesh = new CAirplaneMeshDiffused(pd3dDevice, pd3dCommandList, 30.0f, 20.0f, 1.0f);
 	SetMesh(0, pCubeMesh);
 
 	UINT ncbElementBytes = ((sizeof(CB_PLAYER_INFO) + 255) & ~255); //256ÀÇ ¹è¼ö
 
-	CPlayerShader* pShader = new CPlayerShader();
+	CTexturedShader* pShader = new CTexturedShader();
 	pShader->CreateShader(pd3dDevice, pd3dGraphicsRootSignature);
+	pShader->CreateCbvSrvDescriptorHeaps(pd3dDevice, 1, 1);
 	pShader->CreateShaderVariables(pd3dDevice, pd3dCommandList);
-	pShader->CreateCbvSrvDescriptorHeaps(pd3dDevice, 1, 0);
 	pShader->CreateConstantBufferViews(pd3dDevice, 1, m_pd3dcbPlayer, ncbElementBytes);
+	pShader->CreateShaderResourceViews(pd3dDevice, pTexture, 0, 3);
 
 	SetCbvGPUDescriptorHandle(pShader->GetGPUCbvDescriptorStartHandle());
+	SetCbvGPUDescriptorHandlePtr(pShader->GetGPUCbvDescriptorStartHandle().ptr);
 
 	SetShader(pShader);
 
 	CHeightMapTerrain* pTerrain = (CHeightMapTerrain*)pContext;
-	SetPosition(XMFLOAT3(pTerrain->GetWidth() * 0.5f, 200.0f, pTerrain->GetLength() * 0.5f));
+	SetPosition(XMFLOAT3(pTerrain->GetWidth() * 0.5f, 40.0f, pTerrain->GetLength() * 0.5f));
 	SetPlayerUpdatedContext(pTerrain);
 	SetCameraUpdatedContext(pTerrain);
 }
@@ -422,6 +438,23 @@ void CTerrainPlayer::OnPlayerUpdateCallback(float fTimeElapsed)
 	int z = (int)(xmf3PlayerPosition.z / xmf3Scale.z);
 	bool bReverseQuad = ((z % 2) != 0);
 	float fHeight = pTerrain->GetHeight(xmf3PlayerPosition.x, xmf3PlayerPosition.z, bReverseQuad) + 6.0f;
+	float fWidth = pTerrain->GetWidth();
+
+	if (xmf3PlayerPosition.x < fWidth * 0.33f)
+	{
+		SetFriction(100.0f);
+	}
+	else if (xmf3PlayerPosition.x > fWidth * 0.66f)
+	{
+		SetFriction(500.0f);
+	}
+	else 
+		SetFriction(250.0f);
+	if (xmf3PlayerPosition.y < 50.0f)
+	{
+		SetFriction(250.0f);
+	}
+
 	if (xmf3PlayerPosition.y < fHeight)
 	{
 		XMFLOAT3 xmf3PlayerVelocity = GetVelocity();
@@ -431,16 +464,6 @@ void CTerrainPlayer::OnPlayerUpdateCallback(float fTimeElapsed)
 		SetPosition(xmf3PlayerPosition);
 		m_bJump = false;
 	}
-	//if (xmf3PlayerPosition.y < 50.0f)
-	//{
-	//	XMFLOAT3 xmf3PlayerVelocity = GetVelocity();
-	//	xmf3PlayerVelocity.y = 0.0f;
-	//	xmf3PlayerVelocity.x = 0.0f;
-	//	xmf3PlayerVelocity.z = 0.0f;
-	//	SetVelocity(xmf3PlayerVelocity);
-	//	xmf3PlayerPosition.y = 50.0f;
-	//	SetPosition(xmf3PlayerPosition);
-	//}
 }
 
 void CTerrainPlayer::OnCameraUpdateCallback(float fTimeElapsed)
@@ -509,7 +532,7 @@ void CTerrainPlayer::OnUpdateTransform()
 
 void CTerrainPlayer::Jump()
 {
-	XMFLOAT3 Jump = XMFLOAT3(0.0f, 15.0f, 0.0f);
+	XMFLOAT3 Jump = XMFLOAT3(0.0f, 150.0f, 0.0f);
 	if (!m_bJump)
 	{
 		m_xmf3Velocity = Vector3::Add(m_xmf3Velocity, Jump);

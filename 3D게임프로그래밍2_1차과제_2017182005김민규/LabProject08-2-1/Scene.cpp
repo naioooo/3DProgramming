@@ -14,13 +14,12 @@ CScene::~CScene()
 {
 }
 
-//#define _WITH_TERRAIN_PARTITION
 
 void CScene::BuildObjects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *pd3dCommandList)
 {
 	m_pd3dGraphicsRootSignature = CreateGraphicsRootSignature(pd3dDevice);
 
-	XMFLOAT3 xmf3Scale(4.0f, 0.5, 4.0f);
+	XMFLOAT3 xmf3Scale(4.0f, 1.0f, 4.0f);
 	XMFLOAT4 xmf4Color(0.0f, 0.5f, 0.5f, 0.0f);
 #ifdef _WITH_TERRAIN_PARTITION
 	m_pTerrain = new CHeightMapTerrain(pd3dDevice, pd3dCommandList, m_pd3dGraphicsRootSignature, _T("Image/HeightMap.raw"), 257, 257, 17, 17, xmf3Scale, xmf4Color);
@@ -29,9 +28,8 @@ void CScene::BuildObjects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *p
 #endif
 
 	m_pTerrainWater = new CTerrainWater(pd3dDevice, pd3dCommandList, m_pd3dGraphicsRootSignature, 257 * xmf3Scale.x, 257 * xmf3Scale.z);
-	m_pTerrainWater->SetPosition(+(257 * xmf3Scale.x * 0.5f), 40.0f, +(257 * xmf3Scale.z * 0.5f));
-
-
+	m_pTerrainWater->SetPosition(+(257 * xmf3Scale.x * 0.5f), 50.0f, +(257 * xmf3Scale.z * 0.5f));
+	
 	m_pBillboardShader = new CBillboardShader();
 	m_pBillboardShader->CreateShader(pd3dDevice, m_pd3dGraphicsRootSignature);
 	m_pBillboardShader->BuildObjects(pd3dDevice, pd3dCommandList, m_pTerrain);
@@ -39,6 +37,14 @@ void CScene::BuildObjects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandList *p
 	m_pBullet = new CBulletShader();
 	m_pBullet->CreateShader(pd3dDevice, m_pd3dGraphicsRootSignature);
 	m_pBullet->BuildObjects(pd3dDevice, pd3dCommandList, m_pTerrain);
+
+	m_pExplosiveShader = new CExplosiveShader();
+	m_pExplosiveShader->CreateShader(pd3dDevice, m_pd3dGraphicsRootSignature);
+	m_pExplosiveShader->BuildObjects(pd3dDevice, pd3dCommandList, m_pTerrain);
+	
+	m_pEnemyShader = new CEnemyShader();
+	m_pEnemyShader->CreateShader(pd3dDevice, m_pd3dGraphicsRootSignature);
+	m_pEnemyShader->BuildObjects(pd3dDevice, pd3dCommandList, m_pTerrain);
 
 	m_pSkyBox = new CSkyBox(pd3dDevice, pd3dCommandList, m_pd3dGraphicsRootSignature);
 
@@ -71,18 +77,7 @@ bool CScene::OnProcessingKeyboardMessage(HWND hWnd, UINT nMessageID, WPARAM wPar
 void CScene::ReleaseObjects()
 {
 	if (m_pd3dGraphicsRootSignature) m_pd3dGraphicsRootSignature->Release();
-
-	if (m_ppShaders)
-	{
-		for (int i = 0; i < m_nShaders; i++)
-		{
-			m_ppShaders[i]->ReleaseShaderVariables();
-			m_ppShaders[i]->ReleaseObjects();
-			m_ppShaders[i]->Release();
-		}
-		delete[] m_ppShaders;
-	}
-
+	
 	ReleaseShaderVariables();
 
 	if (m_pTerrain) delete m_pTerrain;
@@ -90,28 +85,27 @@ void CScene::ReleaseObjects()
 	if (m_pSkyBox) delete m_pSkyBox;
 	if (m_pBullet) delete m_pBullet;
 	if (m_pBillboardShader) delete m_pBillboardShader;
+	if (m_pEnemyShader) delete m_pEnemyShader;
+	if (m_pExplosiveShader) delete m_pExplosiveShader;
 
 }
 
 void CScene::ReleaseUploadBuffers()
 {
-	for (int i = 0; i < m_nShaders; i++)
-	{
-		if (m_ppShaders[i])
-			m_ppShaders[i]->ReleaseUploadBuffers();
-	}
 	if (m_pTerrain) m_pTerrain->ReleaseUploadBuffers();
 	if (m_pTerrainWater) m_pTerrainWater->ReleaseUploadBuffers();
 	if (m_pSkyBox) m_pSkyBox->ReleaseUploadBuffers();
 	if (m_pBullet) m_pBullet->ReleaseUploadBuffers();
 	if (m_pBillboardShader) m_pBillboardShader->ReleaseUploadBuffers();
+	if (m_pEnemyShader) m_pEnemyShader->ReleaseUploadBuffers();
+	if (m_pExplosiveShader) m_pExplosiveShader->ReleaseUploadBuffers();
 }
 
 ID3D12RootSignature *CScene::CreateGraphicsRootSignature(ID3D12Device *pd3dDevice)
 {
 	ID3D12RootSignature *pd3dGraphicsRootSignature = NULL;
 
-	D3D12_DESCRIPTOR_RANGE pd3dDescriptorRanges[5];
+	D3D12_DESCRIPTOR_RANGE pd3dDescriptorRanges[6];
 
 	pd3dDescriptorRanges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
 	pd3dDescriptorRanges[0].NumDescriptors = 1;
@@ -263,23 +257,30 @@ bool CScene::ProcessInput(UCHAR *pKeysBuffer)
 
 void CScene::CheckObjectByBulletCollisions()
 {
-	for (int i = 0; i < m_pBillboardShader->m_nBillboardObjects; i++)
+	for (int i = 0; i < m_pEnemyShader->m_nEnemyObjects; i++)
 	{
 		for (int j = 0; j < m_pBullet->m_nBulletObjects; j++)
 		{
-			if (m_pBullet->m_ppBulletObjects[j]->m_bActive && m_pBillboardShader->m_ppBillboardObjects[i]->m_bActive)
+			if ( m_pEnemyShader->m_ppEnemyObjects[i]->m_bActive && m_pBullet->m_ppBulletObjects[j]->m_bActive )
 			{
-				if (m_pBillboardShader->m_ppBillboardObjects[i]->m_xmOOBB.Intersects(m_pBullet->m_ppBulletObjects[j]->m_xmOOBB))
+				if (m_pEnemyShader->m_ppEnemyObjects[i]->m_xmOOBB.Intersects(m_pBullet->m_ppBulletObjects[j]->m_xmOOBB))
 				{
-					m_pBillboardShader->m_ppBillboardObjects[i]->SetActive(false);
+					m_pEnemyShader->m_ppEnemyObjects[i]->SetActive(false);
 					m_pBullet->m_ppBulletObjects[j]->SetActive(false);
+
+					for (int k = 0; k < m_pExplosiveShader->m_nExplosiveObjects; k++)
+					{
+						if (!m_pExplosiveShader->m_ppExplosiveObjects[k]->m_bActive)
+						{
+							m_pExplosiveShader->m_ppExplosiveObjects[k]->SetActive(true);
+							m_pExplosiveShader->m_ppExplosiveObjects[k]->SetPosition(m_pBullet->m_ppBulletObjects[j]->GetPosition());
+							m_pExplosiveShader->m_ppExplosiveObjects[k]->SetBlowingUp(true);
+							break;
+						}
+					}
+
 					XMFLOAT3 SetPos = XMFLOAT3(0.0f, 200.0f, 0.0f);
 					m_pBullet->m_ppBulletObjects[j]->SetPosition(SetPos);
-
-					/*CExplosiveObject* pExplosiveObject = (CExplosiveObject*)m_pBillboardShader->m_ppBillboardObjects[i].m_pExplosiveObject;
-					pExplosiveObject->SetActive(true);
-					pExplosiveObject->SetPosition(m_pPlayer->GetPosition());
-					pExplosiveObject->m_bBlowingUp = true;*/
 				}
 			}
 		}
@@ -288,15 +289,14 @@ void CScene::CheckObjectByBulletCollisions()
 
 void CScene::AnimateObjects(float fTimeElapsed, CCamera *pCamera)
 {
-	for (int i = 0; i < m_nShaders; i++)
-	{
-		if (m_ppShaders[i])
-			m_ppShaders[i]->AnimateObjects(fTimeElapsed, pCamera);
-	}
 	if (m_pBullet)
 		m_pBullet->AnimateObjects(fTimeElapsed, pCamera);
 	if (m_pBillboardShader)
 		m_pBillboardShader->AnimateObjects(fTimeElapsed, pCamera);
+	if (m_pEnemyShader)
+		m_pEnemyShader->AnimateObjects(fTimeElapsed, pCamera);
+	if (m_pExplosiveShader)
+		m_pExplosiveShader->AnimateObjects(fTimeElapsed, pCamera);
 
 	CheckObjectByBulletCollisions();
 
@@ -320,12 +320,9 @@ void CScene::Render(ID3D12GraphicsCommandList *pd3dCommandList, CCamera *pCamera
 	if (m_pTerrain) m_pTerrain->Render(pd3dCommandList, pCamera);
 	if (m_pBullet) m_pBullet->Render(pd3dCommandList, pCamera);
 	if (m_pBillboardShader) m_pBillboardShader->Render(pd3dCommandList, pCamera);
+	if (m_pEnemyShader) m_pEnemyShader->Render(pd3dCommandList, pCamera);
+	if (m_pExplosiveShader) m_pExplosiveShader->Render(pd3dCommandList, pCamera);
 
-	for (int i = 0; i < m_nShaders; i++)
-	{
-		if (m_ppShaders[i])
-			m_ppShaders[i]->Render(pd3dCommandList, pCamera);
-	}
 
 }
 

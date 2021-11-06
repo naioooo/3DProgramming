@@ -319,6 +319,21 @@ public:
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
+class CEnemyObject : public CGameObject
+{
+public:
+	CEnemyObject(int nMeshes = 1);
+	virtual ~CEnemyObject();
+
+	XMFLOAT3						m_xmf3RotationAxis;
+	float							m_fRotationSpeed;
+
+	virtual void Animate(float fTimeElapsed);
+	virtual void Render(ID3D12GraphicsCommandList* pd3dCommandList, CCamera* pCamera = NULL);
+};
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
 class CBulletObject : public CGameObject
 {
 public:
@@ -347,7 +362,7 @@ public:
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
-#define EXPLOSION_DEBRISES		50
+
 
 class CExplosiveObject : public CGameObject
 {
@@ -359,8 +374,6 @@ public:
 	bool						m_bBlowingUp = false;
 	bool						m_bCollied = false;
 
-	XMFLOAT4X4					m_pxmf4x4Transforms[EXPLOSION_DEBRISES];
-
 	float						m_fElapsedTimes = 0.0f;
 	float						m_fDuration = 2.5f;
 	float						m_fExplosionSpeed = 10.0f;
@@ -368,12 +381,7 @@ public:
 
 	virtual void Animate(float fElapsedTime, CCamera* pCamera);
 	virtual void SetLookAt(XMFLOAT3& xmf3Target);
-	virtual void Render(ID3D12GraphicsCommandList* pd3dCommandList, CCamera* pCamera);
+	virtual void SetBlowingUp(bool bBlowingUp) { m_bBlowingUp = bBlowingUp; }
 
-public:
-	static CMesh                *m_pExplosionMesh;
-	static XMFLOAT3				m_pxmf3SphereVectors[EXPLOSION_DEBRISES];
-
-	static void PrepareExplosion(ID3D12Device* pd3dDevice, ID3D12GraphicsCommandList* pd3dCommandList);
 };
 

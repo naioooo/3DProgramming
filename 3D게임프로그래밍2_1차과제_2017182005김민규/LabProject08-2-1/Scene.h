@@ -40,10 +40,12 @@ public:
 	CBulletShader               *m_pBullet = NULL;
 
 protected:
-	CBillboardShader            **m_ppShaders = NULL;
-	int							m_nShaders = 0;
 
 	CBillboardShader            *m_pBillboardShader = NULL;
+
+	CExplosiveShader            *m_pExplosiveShader = NULL;
+
+	CEnemyShader                *m_pEnemyShader = NULL;
 
 	CHeightMapTerrain			*m_pTerrain = NULL;
 	CSkyBox                     *m_pSkyBox = NULL;

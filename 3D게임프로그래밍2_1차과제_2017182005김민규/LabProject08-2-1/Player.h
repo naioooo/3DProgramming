@@ -131,7 +131,6 @@ public:
 
 	virtual void OnUpdateTransform();
 	virtual void Animate(float fElapsedTime, CCamera* pCamera);
-	//virtual void Render(ID3D12GraphicsCommandList* pd3dCommandList, CCamera* pCamera = NULL);
 
 
 
