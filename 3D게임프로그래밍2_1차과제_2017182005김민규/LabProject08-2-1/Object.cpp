@@ -780,6 +780,7 @@ void CBulletObject::Animate(float fElapsedTime, CCamera* pCamera)
 	}
 
 	UpdateBoundingBox();
+	OnBulletUpdateCallback(fElapsedTime);
 
 }
 
@@ -797,16 +798,6 @@ void CBulletObject::OnBulletUpdateCallback(float fTimeElapsed)
 	}
 }
 
-void CBulletObject::SetLookAt(XMFLOAT3& xmf3Target)
-{
-	XMFLOAT3 xmf3Up(0.0f, 1.0f, 0.0f);
-	XMFLOAT3 xmf3Position(m_xmf4x4World._41, m_xmf4x4World._42, m_xmf4x4World._43);
-	XMFLOAT3 xmf3Look = Vector3::Subtract(xmf3Target, xmf3Position);
-	XMFLOAT3 xmf3Right = Vector3::CrossProduct(xmf3Up, xmf3Look, true);
-	m_xmf4x4World._11 = xmf3Right.x; m_xmf4x4World._12 = xmf3Right.y; m_xmf4x4World._13 = xmf3Right.z;
-	m_xmf4x4World._21 = xmf3Up.x; m_xmf4x4World._22 = xmf3Up.y; m_xmf4x4World._23 = xmf3Up.z;
-	m_xmf4x4World._31 = xmf3Right.x; m_xmf4x4World._32 = xmf3Right.y; m_xmf4x4World._33 = xmf3Right.z;
-}
 
 ////////////////////////////////////////////////////////////
 
@@ -825,7 +816,6 @@ void CExplosiveObject::Animate(float fElapsedTime, CCamera *pCamera)
 	if (m_bBlowingUp)
 	{
 		m_fElapsedTimes += fElapsedTime;
-		CGameObject::Rotate(&m_xmf3RotationAxis, m_fRotationSpeed * fElapsedTime);
 		XMFLOAT3 xmf3CameraPosition = pCamera->GetPosition();
 		SetLookAt(xmf3CameraPosition);
 		if (m_fElapsedTimes > m_fDuration)

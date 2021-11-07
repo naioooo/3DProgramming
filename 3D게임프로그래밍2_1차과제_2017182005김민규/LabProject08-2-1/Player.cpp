@@ -151,6 +151,13 @@ void CPlayer::Rotate(float x, float y, float z)
 	m_xmf3Up = Vector3::CrossProduct(m_xmf3Look, m_xmf3Right, true);
 }
 
+void CPlayer::Rotate(XMFLOAT3* pxmf3Axis, float fAngle)
+{
+	XMMATRIX mtxRotate = XMMatrixRotationAxis(XMLoadFloat3(pxmf3Axis), XMConvertToRadians(fAngle));
+	m_xmf4x4World = Matrix4x4::Multiply(mtxRotate, m_xmf4x4World);
+}
+
+
 void CPlayer::Update(float fTimeElapsed)
 {
 	m_xmf3Velocity = Vector3::Add(m_xmf3Velocity, Vector3::ScalarProduct(m_xmf3Gravity, fTimeElapsed, false));
@@ -348,7 +355,7 @@ CTerrainPlayer::CTerrainPlayer(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandLi
 	CreateShaderVariables(pd3dDevice, pd3dCommandList);
 
 	CTexture* pTexture = new CTexture(1, RESOURCE_TEXTURE2D, 0, 1);
-	pTexture->LoadTextureFromDDSFile(pd3dDevice, pd3dCommandList, L"Image/brick01.dds", RESOURCE_TEXTURE2D, 0);	
+	pTexture->LoadTextureFromDDSFile(pd3dDevice, pd3dCommandList, L"Image/SteelTexture.dds", RESOURCE_TEXTURE2D, 0);	
 
 #ifdef _WITH_BATCH_MATERIAL
 	m_pMaterial = new CMaterial();
@@ -358,10 +365,11 @@ CTerrainPlayer::CTerrainPlayer(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandLi
 	pCubeMaterial->SetTexture(pTexture);
 #endif
 
-	CAirplaneMeshDiffused* pCubeMesh = new CAirplaneMeshDiffused(pd3dDevice, pd3dCommandList, 30.0f, 20.0f, 1.0f);
+	CCarMeshDiffused* pCubeMesh = new CCarMeshDiffused(pd3dDevice, pd3dCommandList, 5.0f, 8.0f, 10.0f);
 	SetMesh(0, pCubeMesh);
 
 	UINT ncbElementBytes = ((sizeof(CB_PLAYER_INFO) + 255) & ~255); //256ÀÇ ¹è¼ö
+
 
 	CTexturedShader* pShader = new CTexturedShader();
 	pShader->CreateShader(pd3dDevice, pd3dGraphicsRootSignature);
@@ -374,6 +382,8 @@ CTerrainPlayer::CTerrainPlayer(ID3D12Device *pd3dDevice, ID3D12GraphicsCommandLi
 	SetCbvGPUDescriptorHandlePtr(pShader->GetGPUCbvDescriptorStartHandle().ptr);
 
 	SetShader(pShader);
+
+
 
 	CHeightMapTerrain* pTerrain = (CHeightMapTerrain*)pContext;
 	SetPosition(XMFLOAT3(pTerrain->GetWidth() * 0.5f, 40.0f, pTerrain->GetLength() * 0.5f));
@@ -441,19 +451,13 @@ void CTerrainPlayer::OnPlayerUpdateCallback(float fTimeElapsed)
 	float fWidth = pTerrain->GetWidth();
 
 	if (xmf3PlayerPosition.x < fWidth * 0.33f)
-	{
 		SetFriction(100.0f);
-	}
 	else if (xmf3PlayerPosition.x > fWidth * 0.66f)
-	{
 		SetFriction(500.0f);
-	}
 	else 
 		SetFriction(250.0f);
 	if (xmf3PlayerPosition.y < 50.0f)
-	{
 		SetFriction(250.0f);
-	}
 
 	if (xmf3PlayerPosition.y < fHeight)
 	{

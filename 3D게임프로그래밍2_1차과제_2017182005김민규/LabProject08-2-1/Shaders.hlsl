@@ -132,7 +132,7 @@ float4 PSTerrain(VS_TERRAIN_OUTPUT input) : SV_TARGET
 	float fAlpha = gtxtTerrainAlphaTexture.Sample(gSamplerState, input.uv0);
 
 	float4 cDetailTexColors[3];
-	cDetailTexColors[0] = gtxtTerrainDetailTextures[0].Sample(gSamplerState, input.uv1 * 1.0f);
+	cDetailTexColors[0] = gtxtTerrainDetailTextures[0].Sample(gSamplerState, input.uv1 * 0.125f);
 	cDetailTexColors[1] = gtxtTerrainDetailTextures[1].Sample(gSamplerState, input.uv1 * 0.125f);
 	cDetailTexColors[2] = gtxtTerrainDetailTextures[2].Sample(gSamplerState, input.uv1);
 
@@ -176,7 +176,7 @@ static matrix<float, 3, 3> sf3x3TextureAnimation = { { 1.0f, 0.0f, 0.0f }, { 0.0
 
 //#define _WITH_BASE_TEXTURE_ONLY
 #define _WITH_FULL_TEXTURES
-
+//
 #ifndef _WITH_TEXTURE_ANIMATION
 float4 PSTerrainWater(VS_WATER_OUTPUT input) : SV_TARGET
 {
@@ -185,17 +185,7 @@ float4 PSTerrainWater(VS_WATER_OUTPUT input) : SV_TARGET
 	float4 cDetail1TexColor = gtxtWaterDetail1Texture.Sample(gSamplerState, input.uv * 20.0f);
 
 	float4 cColor = float4(0.0f, 0.0f, 0.0f, 1.0f);
-#ifdef _WITH_BASE_TEXTURE_ONLY
-	cColor = cBaseTexColor;
-#else
-#ifdef _WITH_FULL_TEXTURES
-	cColor = lerp(cBaseTexColor * cDetail0TexColor, cDetail1TexColor.r * 0.5f, 0.35f);
-#else
-	cColor = cBaseTexColor * cDetail0TexColor;
-#endif
-#endif
 
-	return(cColor);
 }
 #else
 #define _WITH_CONSTANT_BUFFER_MATRIX

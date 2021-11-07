@@ -351,13 +351,12 @@ public:
 
 	XMFLOAT3					m_xmf3FirePosition;
 	float						m_fRotationAngle = 0.0f;
+
 	void SetBulletUpdatedContext(LPVOID pContext) { m_pBulletUpdatedContext = pContext; }
 
 	void SetFirePosition(XMFLOAT3 xmf3FirePosition);
 
 	void OnBulletUpdateCallback(float fTimeElapsed);
-
-	void SetLookAt(XMFLOAT3& xmf3Target);
 };
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

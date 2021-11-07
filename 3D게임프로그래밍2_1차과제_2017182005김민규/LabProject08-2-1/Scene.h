@@ -37,7 +37,7 @@ public:
 	CHeightMapTerrain *GetTerrain() { return(m_pTerrain); }
 
 	CPlayer						*m_pPlayer = NULL;
-	CBulletShader               *m_pBullet = NULL;
+	CBulletShader               *m_pBulletShader = NULL;
 
 protected:
 

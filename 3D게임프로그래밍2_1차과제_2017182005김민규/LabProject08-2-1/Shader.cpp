@@ -279,7 +279,7 @@ D3D12_SHADER_BYTECODE CPlayerShader::CreateVertexShader(ID3DBlob **ppd3dShaderBl
 
 D3D12_SHADER_BYTECODE CPlayerShader::CreatePixelShader(ID3DBlob **ppd3dShaderBlob)
 {
-	return(CShader::CompileShaderFromFile(L"Shaders.hlsl", "PSPlayer", "ps_5_1", ppd3dShaderBlob));
+	return(CShader::CompileShaderFromFile(L"Shaders.hlsl", "PSTextured", "ps_5_1", ppd3dShaderBlob));
 }
 
 void CPlayerShader::CreateShader(ID3D12Device *pd3dDevice, ID3D12RootSignature *pd3dGraphicsRootSignature)
@@ -714,6 +714,7 @@ void CBulletShader::BuildObjects(ID3D12Device *pd3dDevice, ID3D12GraphicsCommand
 		pBulletObject = new CBulletObject(1);
 		pBulletObject->SetMesh(0, pBulletMesh);
 		pBulletObject->m_xmOOBB = pBulletMesh->m_xmOOBB;
+		pBulletObject->SetBulletUpdatedContext(pTerrain);
 #ifndef _WITH_BATCH_MATERIAL
 		pRotatingObject->SetMaterial(pCubeMaterial);
 #endif
